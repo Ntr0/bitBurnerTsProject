@@ -12,13 +12,15 @@ export async function main(ns: NS) {
     ns.disableLog("sleep")
     ns.disableLog("scan")
     ns.disableLog("getHackingLevel")
+    let reset = opts.reset
     while (true) {
         try {
             logger.info("Scanning")
-            await crawl(ns, logger, opts.reset, 20)
+            await crawl(ns, logger, reset, 20)
         } catch (e) {
             logger.error(`caught err: ${e}`)
         }
+        reset = false
         await ns.sleep(10000)
     }
 

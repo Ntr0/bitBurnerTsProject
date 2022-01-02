@@ -8,7 +8,7 @@ const hackRatio = 0.75 // we are only aming to get 75% of the money available, t
 const weakFactor = 0.05
 const fortifyAmount = 0.002
 
-export class Server implements IServer{
+export class Server implements IServer {
     ns: NS
     logger: ILogger
     name: string
@@ -22,7 +22,7 @@ export class Server implements IServer{
     rooted: boolean = false
     curMoney: number = 0
     maximumMoney: number = 0
-
+    maxRam: number = -1
     weakThreads: number = 0
     weakTime: number = 0
     minSecLevel: number = 0
@@ -30,7 +30,7 @@ export class Server implements IServer{
     secIncrease: number = 0
     invalid: boolean = false
     hackThreads = 0
-    public backdoor :boolean = false
+    public backdoor: boolean = false
     private hackAmount: number = 0;
     private baseHackThreads: number = 0;
     hackChance: number = 0;
@@ -41,14 +41,17 @@ export class Server implements IServer{
         this.name = name
         this.parent = parent
     }
-    static fromIServer(ns:NS, srv: IServer) :Server{
+
+    static fromIServer(ns: NS, srv: IServer): Server {
         let server = new Server(ns, srv.name, srv.parent)
         server.maximumMoney = srv.maximumMoney
         server.hackingLevel = srv.hackingLevel
         server.rooted = srv.rooted
         server.backdoor = srv.backdoor
+        server.maxRam = srv.maxRam
         return server
     }
+
     getWeakAfterHack() {
         if (!this.hackable()) {
             return 0
@@ -176,7 +179,7 @@ export class Server implements IServer{
         var hack = `H[${this.hackThreads}->${this.ns.nFormat(this.hackAmount, '$0.00a')} => S+${this.secIncrease.toFixed(2)}]`
         var money = `M[${this.ns.nFormat(this.curMoney, "$0.00a")}/${this.ns.nFormat(this.maximumMoney, "$0.00a")}`
         var root = this.rooted ? "+" : "-"
-        var backdoor = this.backdoor ? "+": "-"
+        var backdoor = this.backdoor ? "+" : "-"
         return `${root}${backdoor}[${this.name}]:\t(${this.hackingLevel}) NA[${this.nextAction()}] ${grow} ${weak} ${hack} ${money}`
     }
 

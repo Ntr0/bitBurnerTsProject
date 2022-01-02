@@ -18,7 +18,10 @@ function localeHHMMSS(ms = 0) {
 }
 
 export interface ILogger {
-    setLevel(lvl: LogLevel): ILogger
+    withLevel(lvl: LogLevel): ILogger
+
+    withWriter(writer: LogWriter): ILogger
+
     panic(msg: string, ...args: any)
 
     error(msg: string, ...args: any)
@@ -36,7 +39,7 @@ interface logWriter {
     writeLog(msg: string, ...args: any)
 }
 
-class TermWriter {
+export class TermWriter {
     ns: NS
 
     constructor(ns: NS) {
@@ -48,7 +51,7 @@ class TermWriter {
     }
 }
 
-class LogWriter {
+export class LogWriter {
     ns: NS
 
     constructor(ns: NS) {
@@ -65,8 +68,9 @@ export class Logger implements ILogger {
     ns: NS
     log: logWriter
     level: LogLevel = LogLevel.Info
+    private static _instance: Logger
 
-    constructor(ns: NS, log?: logWriter) {
+    private constructor(ns: NS, log?: logWriter) {
         this.ns = ns
         if (log) {
             this.log = log
@@ -74,12 +78,23 @@ export class Logger implements ILogger {
             this.log = new LogWriter(ns)
         }
     }
-    setLevel(logLevel:LogLevel): ILogger {
+
+    public static Instance(ns: NS) {
+        return this._instance || (this._instance = new this(ns))
+    }
+
+    withWriter(writer: LogWriter): ILogger {
+        this.log = writer
+        return this
+    }
+
+    withLevel(logLevel: LogLevel): ILogger {
         this.level = logLevel
         return this
     }
 
     _log(lvl: LogLevel, msg, args) {
+        //       this.ns.print(`${lvl} > ${this.level}`)
         if (lvl > this.level) {
             return
         }
@@ -138,17 +153,6 @@ export class Logger implements ILogger {
 
 }
 
-export class TermLogger extends Logger {
-    constructor(ns) {
-        super(ns, new TermWriter(ns));
-    }
-}
-
-let logger: ILogger
-
 export function getLogger(ns:NS) : ILogger {
-    if (typeof(logger) === 'undefined' ) {
-        logger = new Logger(ns)
-    }
-    return logger
+    return Logger.Instance(ns)
 }

@@ -1,5 +1,5 @@
 import {pathServerMap} from "/lib/consts"
-import {mapToJSON, mapFromJSON} from "/lib/map";
+import {mapFromJSON, mapToJSON} from "/lib/map";
 import {NS} from "Bitburner";
 
 
@@ -10,19 +10,20 @@ export interface IServer {
     rooted: boolean
     hackingLevel : number
     maximumMoney: number
+    maxRam: number
 
 }
 
 export function newServer(name, parent): IServer {
-    let server: IServer = {
+    return {
         name: name,
         parent: parent,
         backdoor: false,
         rooted: false,
         hackingLevel: -1,
         maximumMoney: -1,
+        maxRam: -1,
     }
-    return server
 }
 
 export async function loadServerMap(ns:NS) : Promise<Map<string,IServer>> {

@@ -1,10 +1,9 @@
 import {Server} from "/lib/Server"
-import {Action} from "/lib/consts";
+import {Action, pathEventQueue} from "/lib/consts";
 import {IServer, loadServerMap} from "/lib/ServerMap"
 import {EventQueue, loadEventQueue} from "/lib/EventQueue"
 import {runThreads} from "/lib/Scheduler"
 import {getLogger, LogLevel} from "/lib/Logger"
-import {pathEventQueue} from "/lib/consts"
 import {NS} from "Bitburner";
 import {exploitable} from "/lib/ServerFunctions";
 
@@ -39,6 +38,10 @@ function newInitializationEvent(name: string): IEvent {
         needThreads: 0,
         startedThreads: 0
     }
+}
+
+async function optHack(ns: NS, event: IEvent) {
+
 }
 
 async function hackBetter(ns: NS, name: string): Promise<IEvent> {
@@ -81,9 +84,8 @@ async function hackBetter(ns: NS, name: string): Promise<IEvent> {
     return result
 }
 
-async function loadQueue(ns) {
+async function loadQueue(ns: NS): Promise<EventQueue> {
     let logger = getLogger(ns)
-    let hackingServers = new Map()
     let queue
     try {
         queue = await loadEventQueue(ns, pathEventQueue)
@@ -91,21 +93,28 @@ async function loadQueue(ns) {
         logger.error(`got error ${e}`)
         queue = new EventQueue(ns)
     }
+    return queue
+}
 
+function getServerListFromQueue(ns: NS, queue: EventQueue): Map<string, Server> {
+    let hackingServers = new Map()
     for (let i = 0; i < queue.length(); i++) {
-        let server = new Server(ns, queue.data[i].server.name)
+        let server = new Server(ns, queue.data[i].server)
         queue.data[i].server = server
         hackingServers.set(server.name, server)
     }
-    return [queue, hackingServers]
+    return hackingServers
 }
 
 async function getHackableServers(ns: NS): Promise<IServer[]> {
     let result: IServer[] = []
     const serverMap = await loadServerMap(ns)
+    let logger = getLogger(ns)
     for (const server of serverMap.values()) {
         if (exploitable(ns, server)) {
             result.push(server)
+        } else {
+            logger.debug(`${server.name} is not exploitable`)
         }
     }
     return result
@@ -119,14 +128,15 @@ export async function main(ns: NS) {
 
     ns.disableLog("ALL")
     let logger = getLogger(ns)
-    logger.setLevel(LogLevel.Debug)
+    logger.withLevel(LogLevel.Debug)
     let queue = new EventQueue(ns)
-    let hackingServers = new Map()
+    let hackingServers: Map<string, IServer> = new Map()
     const queueTimeout = 10000
-    if (opts.reset == false) {
-        [queue, hackingServers] = await loadQueue(ns)
+    if (!opts.reset) {
+        logger.info("loading queue")
+        queue = await loadQueue(ns)
+        hackingServers = getServerListFromQueue(ns, queue)
     }
-
 
     while (true) {
         for (const srv of await getHackableServers(ns)) {
@@ -147,7 +157,7 @@ export async function main(ns: NS) {
                 await ns.sleep(queueTimeout)
                 break
             }
-            let srvState = await queue.blockShiftUntil(1000)
+            let srvState: IEvent = await queue.blockShiftUntil(1000)
             if (srvState != undefined) {
                 let result = await hackBetter(ns, srvState.server)
                 queue.push(result.duration, result)

@@ -1,15 +1,15 @@
-import {loadServerMap, saveServerMap, IServer, newServer} from "/lib/ServerMap"
-import {getLogger, ILogger} from "/lib/Logger"
-import {Server} from "/lib/Server"
+import {IServer, loadServerMap, newServer, saveServerMap} from "/lib/ServerMap"
+import {ILogger} from "/lib/Logger"
 import {NS} from "Bitburner";
-import {hackable} from "/lib/ServerFunctions";
+import {getPath, hackable} from "/lib/ServerFunctions";
+
 class Crawler {
     ns: NS
     logger: ILogger
 
-    constructor(ns: NS) {
+    constructor(ns: NS, logger: ILogger) {
         this.ns = ns
-        this.logger = getLogger(ns)
+        this.logger = logger
     }
 
     async rootServer(name) {
@@ -45,41 +45,34 @@ class Crawler {
     }
 
     connect(serverMap: Map<string, IServer>, target: string) {
-        while (this.ns.getHostname() != "home") {
-            let tgt = serverMap.get(this.ns.getHostname())
-            if (tgt !== undefined && tgt.parent !== undefined) {
-                this.ns.connect(tgt.parent)
-            }
-        }
-        let path: string[] = []
-        let parent = serverMap.get(target)
-        while (parent !== undefined && parent.parent != "" && parent.parent != "home") {
-            path.unshift(parent.parent)
-            parent = serverMap.get(parent.parent)
-        }
+        let path = getPath(serverMap, this.ns.getCurrentServer(), target)
+        this.logger.debug(`connection path from ${this.ns.getHostname()}->${target}: ${path} `)
         for (const srv of path) {
+            this.logger.debug(`connecting to ${srv}`)
             this.ns.connect(srv)
         }
     }
 
-    async installBackdoor(serverMap: Map<string, IServer>, server: string): Promise<boolean> {
-        if (server == "home") {
+    async installBackdoor(serverMap: Map<string, IServer>, server: IServer): Promise<boolean> {
+        if (server.name == "home") {
             return true
         }
-        return false
-        /**
         if (hackable(this.ns, server)) {
-            let host = this.ns.getHostname()
-            this.connect(serverMap, server)
+            let host = this.ns.getCurrentServer()
+            this.connect(serverMap, server.name)
+            if (this.ns.getCurrentServer() != server.name) {
+                this.logger.error(`connected to unexpected server. Expected ${server.name} but connected to ${this.ns.getHostname()}`)
+                return false
+            }
             await this.ns.installBackdoor()
-            await this.ns.sleep(this.ns.getHackTime(server) / 4 )
+//            await this.ns.sleep(this.ns.getHackTime(server.name) / 4)
             this.logger.debug("installed backdoor on" + server)
             this.connect(serverMap, host)
             return true
         }
         return false
-         */
     }
+
     async scanServer(serverMap, visited, name, parent, depth) {
         let ns = this.ns
         if (visited.indexOf(name) > -1) {
@@ -94,6 +87,7 @@ class Crawler {
             serverMap.set(name, srv)
             srv.maximumMoney = ns.getServerMaxMoney(name)
             srv.hackingLevel = ns.getServerRequiredHackingLevel(name)
+            srv.maxRam = ns.getServerMaxRam(name)
         }
         if (!ns.hasRootAccess(name)) {
             srv.rooted = await this.rootServer(name)
@@ -101,7 +95,7 @@ class Crawler {
             srv.rooted = true
         }
         if (!srv.backdoor) {
-            srv.backdoor = await this.installBackdoor(serverMap, name)
+            srv.backdoor = await this.installBackdoor(serverMap, srv)
         }
         const servers = ns.scan(name)
         visited.push(name)
@@ -127,10 +121,14 @@ function cleanServerMap(ns: NS, serverMap: Map<string, any>) {
     }
 }
 
-export async function crawl(ns: NS, depth: number) {
-    let crawler = new Crawler(ns)
-    let serverMap = await loadServerMap(ns)
-    cleanServerMap(ns, serverMap)
+export async function crawl(ns: NS, logger: ILogger, reset: boolean, depth: number) {
+    let crawler = new Crawler(ns, logger)
+    let serverMap: Map<string, IServer> = new Map()
+    crawler.logger.debug("initialized")
+    if (!reset) {
+        serverMap = await loadServerMap(ns)
+        cleanServerMap(ns, serverMap)
+    }
     let visited = []
     await crawler.scanServer(serverMap, visited, "home", undefined, depth)
     await saveServerMap(ns, serverMap)

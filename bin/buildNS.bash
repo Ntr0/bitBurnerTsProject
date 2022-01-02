@@ -1,5 +1,4 @@
 #!/usr/bin/env bash
-
 cd ./build || exit
 
 jsFiles=$(find . -name "*.js")

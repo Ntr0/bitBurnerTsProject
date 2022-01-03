@@ -1,7 +1,6 @@
 import {getLogger, LogLevel, LogWriter} from "/lib/Logger"
 import {loadEventQueue} from "/lib/EventQueue"
 import {loadServerMap} from "/lib/ServerMap"
-import {pathEventQueue} from "/lib/consts"
 import {NS} from "Bitburner";
 
 function makeid(length) {
@@ -41,7 +40,7 @@ function getSmallestServer(ns: NS, servers: string[]): [number, string] {
 }
 
 async function analyzeQueue(ns) {
-    let queue = await loadEventQueue(ns, pathEventQueue)
+    let queue = await loadEventQueue(ns)
     let threadSize = 2 //TODO better analyze script sizes
     let overcommit = 0
     for (let i = 0; i < queue.length(); i++) {

@@ -1,11 +1,12 @@
 import {Server} from "/lib/Server"
-import {Action, pathEventQueue} from "/lib/consts";
+import {Action} from "/lib/consts";
 import {IServer, loadServerMap} from "/lib/ServerMap"
-import {EventQueue, loadEventQueue} from "/lib/EventQueue"
+import {IEvent, loadEventQueue, newEventQueue} from "/lib/EventQueue"
 import {runThreads} from "/lib/Scheduler"
 import {getLogger, LogLevel} from "/lib/Logger"
 import {NS} from "Bitburner";
 import {exploitable} from "/lib/ServerFunctions";
+import {TimedQueue} from "/lib/TimedQueue";
 
 const scriptWeaken = "/hack/weaken.ns"
 const scriptHack = "/hack/hack.ns"
@@ -22,12 +23,29 @@ async function analyzeQueue(queue) {
     return overcommit * threadSize
 }
 
-interface IEvent {
-    server: string
-    duration: number
+
+interface EventAction {
     action: Action
-    needThreads: number
+    requiredThreads: number
     startedThreads: number
+    remainingDuration: number
+}
+
+interface NewEvent {
+    server: string
+    requeue: number
+    actions: EventAction[]
+}
+
+function updateEvent(event: NewEvent) {
+    let actions: EventAction[] = []
+    for (let action of event.actions) {
+        action.remainingDuration -= event.requeue
+        if (action.remainingDuration > 0) {
+            actions.push(action)
+        }
+    }
+    event.actions = actions
 }
 
 function newInitializationEvent(name: string): IEvent {
@@ -35,12 +53,28 @@ function newInitializationEvent(name: string): IEvent {
         server: name,
         duration: 0,
         action: Action.Init,
+        remainingActionDuration: 0,
         needThreads: 0,
         startedThreads: 0
     }
 }
 
-async function optHack(ns: NS, event: IEvent) {
+async function optHack(ns: NS, event: NewEvent) {
+    const logger = getLogger(ns)
+    updateEvent(event)
+    let server = new Server(ns, event.server)
+    server.updateValues()
+    for (let action of event.actions) {
+        switch (action.action) {
+            case Action.Grow:
+
+                break
+            case Action.Hack:
+                break
+        }
+
+    }
+    // if not all threads could be scheduled, we should see if it is worth to try to start the rest
 
 }
 
@@ -69,38 +103,25 @@ async function hackBetter(ns: NS, name: string): Promise<IEvent> {
             duration = ns.getHackTime(server.name)
             break;
     }
-
+    let eventDuration = duration
     logger.debug(`[${server.name}]: ${threads - remain}/${threads} ${action} ${ns.tFormat(duration)}`)
     if (remain == threads) {
-        duration = 5000
+        eventDuration = 5000
     }
-    let result: IEvent = {
-        "server": name,
-        "duration": duration + 1000, // grace period to let all effects tickle in
-        "action": action,
-        "needThreads": threads,
-        "startedThreads": threads - remain
+    return {
+        server: name,
+        duration: eventDuration + 100, // grace period to let all effects tickle in
+        action: action,
+        remainingActionDuration: duration,
+        needThreads: threads,
+        startedThreads: threads - remain
     }
-    return result
 }
 
-async function loadQueue(ns: NS): Promise<EventQueue> {
-    let logger = getLogger(ns)
-    let queue
-    try {
-        queue = await loadEventQueue(ns, pathEventQueue)
-    } catch (e) {
-        logger.error(`got error ${e}`)
-        queue = new EventQueue(ns)
-    }
-    return queue
-}
-
-function getServerListFromQueue(ns: NS, queue: EventQueue): Map<string, Server> {
+function getServerListFromQueue(ns: NS, queue: TimedQueue<IEvent>): Map<string, Server> {
     let hackingServers = new Map()
     for (let i = 0; i < queue.length(); i++) {
         let server = new Server(ns, queue.data[i].server)
-        queue.data[i].server = server
         hackingServers.set(server.name, server)
     }
     return hackingServers
@@ -129,12 +150,12 @@ export async function main(ns: NS) {
     ns.disableLog("ALL")
     let logger = getLogger(ns)
     logger.withLevel(LogLevel.Debug)
-    let queue = new EventQueue(ns)
+    let queue = newEventQueue(ns)
     let hackingServers: Map<string, IServer> = new Map()
     const queueTimeout = 10000
     if (!opts.reset) {
         logger.info("loading queue")
-        queue = await loadQueue(ns)
+        queue = await loadEventQueue(ns)
         hackingServers = getServerListFromQueue(ns, queue)
     }
 
@@ -144,24 +165,24 @@ export async function main(ns: NS) {
                 continue
             }
             queue.push(0, newInitializationEvent(srv.name))
-            await queue.saveToFile(pathEventQueue)
+            await queue.saveToFile()
             hackingServers.set(srv.name, srv)
         }
         logger.debug("finished server scan")
         let start = Date.now()
         while (queueTimeout + start > Date.now()) {
             let [dur, data] = queue.peek()
-            if (dur != undefined) {
-                logger.trace(`peek: ${dur - Date.now()} -> ${data.name}`)
+            if (dur != undefined && data != undefined) {
+                logger.trace(`peek: ${dur - Date.now()} -> ${data.server}`)
             } else {
                 await ns.sleep(queueTimeout)
                 break
             }
-            let srvState: IEvent = await queue.blockShiftUntil(1000)
+            let srvState = await queue.blockShiftUntil(1000)
             if (srvState != undefined) {
                 let result = await hackBetter(ns, srvState.server)
                 queue.push(result.duration, result)
-                await queue.saveToFile(pathEventQueue)
+                await queue.saveToFile()
             }
         }
     }

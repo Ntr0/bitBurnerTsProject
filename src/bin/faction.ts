@@ -32,9 +32,9 @@ function shouldIncreaseReputationAtFaction(ns: NS, me: Player, faction: string):
 }
 
 export async function main(ns: NS) {
-    let me = ns.getPlayer()
     let worked = true
     while (worked) {
+        let me = ns.getPlayer()
         worked = false
         for (const faction of me.factions) {
             if (shouldIncreaseReputationAtFaction(ns, me, faction)) {

@@ -19,6 +19,7 @@ export class Server implements IServer {
     growTime: number = 0
 
     hackingLevel: number = -1
+    hackTime: number = -1
     rooted: boolean = false
     curMoney: number = 0
     maximumMoney: number = 0
@@ -52,6 +53,18 @@ export class Server implements IServer {
         return server
     }
 
+    /**
+     * optimal hacking
+     * when running x threads to hack a server, after it is done at time th1, the security will be raised by sh1
+     * the required weak could have started at th1-weaktime = thw1
+     * same applies to grow => tg1, weak started at tg1 - weakTime = tgw1
+     *
+     * ---|-----|-----|
+     *   tgw1=====x
+     *     tg1===x
+     *      twh1===x
+     *         th1==x
+     */
     getWeakAfterHack() {
         if (!this.hackable()) {
             return 0
@@ -91,7 +104,7 @@ export class Server implements IServer {
                 this.hackAmount = this.curMoney * hackRatio
                 this.baseHackThreads = Math.ceil(ns.hackAnalyzeThreads(this.name, this.hackAmount))
                 this.hackChance = ns.hackAnalyzeChance(this.name)
-
+                this.hackTime = ns.getHackTime(this.name)
                 this.secLevel = ns.getServerSecurityLevel(this.name)
                 this.minSecLevel = ns.getServerMinSecurityLevel(this.name)
 
@@ -150,13 +163,6 @@ export class Server implements IServer {
         return (this.hackingLevel <= this.ns.getHackingLevel() && this.rooted && this.maximumMoney > 0)
     }
 
-    growScore() {
-        if ((this.growAmount > 0) && (this.growTime > 0) && (this.growThreads > 0)) {
-            return (this.growAmount * 10000 / (this.growThreads * this.growTime))
-        }
-        return 0
-    }
-
     printInfo() {
         this._printInfo(this.ns)
     }
@@ -174,9 +180,9 @@ export class Server implements IServer {
     }
 
     shortInfo() {
-        var grow = `G[${this.growThreads}->${this._cFormat(this.growAmount)}](${this.growScore()})`
-        var weak = `W[${this.weakThreads}->${this.secLevel}->${this.minSecLevel}]`
-        var hack = `H[${this.hackThreads}->${this.ns.nFormat(this.hackAmount, '$0.00a')} => S+${this.secIncrease.toFixed(2)}]`
+        var grow = `G[${this.growThreads}->${this.growTime.toFixed(3)}->${this._cFormat(this.growAmount)}]`
+        var weak = `W[${this.weakThreads}->${this.weakTime.toFixed(3)}->${this.secLevel.toFixed(2)}->${this.minSecLevel.toFixed(2)}]`
+        var hack = `H[${this.hackThreads}->${this.hackTime.toFixed(3)}->${this.ns.nFormat(this.hackAmount, '$0.00a')} => S+${this.secIncrease.toFixed(2)}]`
         var money = `M[${this.ns.nFormat(this.curMoney, "$0.00a")}/${this.ns.nFormat(this.maximumMoney, "$0.00a")}`
         var root = this.rooted ? "+" : "-"
         var backdoor = this.backdoor ? "+" : "-"

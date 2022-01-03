@@ -1,12 +1,14 @@
-import { Server } from "/lib/Server"
-import { loadServerMap } from "/lib/ServerMap"
+import {Server} from "/lib/Server"
+import {loadServerMap} from "/lib/ServerMap"
 import {NS} from "Bitburner"
-import {hackable} from "/lib/ServerFunctions";
+import {exploitable, hackable} from "/lib/ServerFunctions";
 
 /** @param {NS} ns **/
 export async function main(ns: NS) {
     let opts = ns.flags([
         ["all", false],
+        ["exploitable", false],
+        ["hackable", false],
     ])
     var serverMap = await loadServerMap(ns)
     var toSort = new Map()
@@ -19,7 +21,9 @@ export async function main(ns: NS) {
     for (const entry of sorted.values()) {
         if (opts.all) {
             ns.tprintf(entry.shortInfo())
-        } else if (hackable(ns, entry)) {
+        } else if (hackable(ns, entry) && opts.hackable) {
+            ns.tprintf(entry.shortInfo())
+        } else if (exploitable(ns, entry) && opts.exploitable) {
             ns.tprintf(entry.shortInfo())
         }
     }

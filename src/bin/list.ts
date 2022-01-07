@@ -2,6 +2,7 @@ import {Server} from "/lib/Server"
 import {loadServerMap} from "/lib/ServerMap"
 import {NS} from "Bitburner"
 import {exploitable, hackable} from "/lib/ServerFunctions";
+import {Context} from "/lib/context";
 
 /** @param {NS} ns **/
 export async function main(ns: NS) {
@@ -10,10 +11,11 @@ export async function main(ns: NS) {
         ["exploitable", false],
         ["hackable", false],
     ])
+    let ctx = new Context(ns)
     var serverMap = await loadServerMap(ns)
     var toSort = new Map()
     for (const [name, server] of serverMap.entries()) {
-        let srv = Server.fromIServer(ns, server)
+        let srv = Server.fromIServer(ctx, server)
         srv.updateValues()
         toSort.set(srv.hackingLevel, srv)
     }

@@ -1,25 +1,25 @@
-
-import { loadServerMap } from "/lib/ServerMap"
-import { getLogger } from "/lib/Logger"
-import {NS} from "Bitburner";
+import {loadServerMap} from "/lib/ServerMap"
+import {getLogger} from "/lib/Logger"
+import {Context, getNS} from "/lib/context";
 
 /**
- * @param {NS} ns
+ * @param {Context} ctx
  * @param {string} serverName
  * @param {string} script script to run
  * @param {int} threads
  * @param {[any]} args arguments to pass to the script
  */
-async function startScript(ns: NS, serverName: string, script: string, threads: any, args: any) {
-    let logger = getLogger(ns)
+async function startScript(ctx: Context, serverName: string, script: string, threads: any, args: any) {
+    let logger = getLogger(ctx)
+    let ns = getNS(ctx)
     if (!ns.fileExists(script, serverName)) {
         if (!await ns.scp(script, "home", serverName)) {
-            logger.error("failed to copy " + script + " to " + serverName)
+            logger.warning("failed to copy " + script + " to " + serverName)
         }
     }
     let pid = ns.exec(script, serverName, threads, ...args)
     if (pid == 0) {
-        logger.error("failed to start " + script + " on " + serverName)
+        logger.warning("failed to start " + script + " on " + serverName)
         return 0
     }
     logger.debug(`started on ${serverName} with ${threads} threads PID[${pid}]: ${script} ${args}`)
@@ -32,15 +32,16 @@ async function startScript(ns: NS, serverName: string, script: string, threads: 
  * it will try all available servers only once, so the number of threads started may be
  * equal or lower than the max threads given.
  *
- * @param {NS} ns namespace
+ * @param {Context} ctx context
  * @param {string} script script to run
  * @param {int} threads total number of threads to start
  * @param {[any]} args args to pass to the script
- * @returns {int} number of threads started.
+ * @returns {int} number of threads remained.
  */
 //
-export async function runThreads(ns:NS, script:string, threads:number, args:string[]) {
-    let logger = getLogger(ns)
+export async function runThreads(ctx: Context, script: string, threads: number, args: string[]) {
+    const logger = getLogger(ctx)
+    const ns = getNS(ctx)
     const serverMap = await loadServerMap(ns)
     const scriptRam = ns.getScriptRam(script)
     try {
@@ -50,7 +51,7 @@ export async function runThreads(ns:NS, script:string, threads:number, args:stri
                 logger.debug(`skip unrooted server ${name}`)
                 continue;
             }
-            let freeRam = ns.getServerMaxRam(name) - ns.getServerUsedRam(name)
+            let freeRam = server.maxRam - ns.getServerUsedRam(name)
             if (name == "home") {
                 freeRam -= 10
             }
@@ -58,7 +59,7 @@ export async function runThreads(ns:NS, script:string, threads:number, args:stri
             if (freeThreads >= 1) {
                 const startThreads = freeThreads > threads ? threads : freeThreads
                 logger.debug(`starting ${script} on ${name} with ${startThreads}, ${threads} remaining`)
-                const started = await startScript(ns, name, script, startThreads, args)
+                const started = await startScript(ctx, name, script, startThreads, args)
                 threads -= started
             }
             if (threads <= 0) {
@@ -66,7 +67,7 @@ export async function runThreads(ns:NS, script:string, threads:number, args:stri
             }
         }
     } catch (e) {
-        logger.error(`catched error ${e}`)
+        logger.error(e, `catched error ${e}`)
     }
     return threads
 }

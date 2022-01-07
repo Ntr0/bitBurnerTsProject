@@ -3,10 +3,11 @@ import {Action} from "/lib/consts";
 import {IServer, loadServerMap} from "/lib/ServerMap"
 import {IEvent, loadEventQueue, newEventQueue} from "/lib/EventQueue"
 import {runThreads} from "/lib/Scheduler"
-import {getLogger, LogLevel} from "/lib/Logger"
+import {getLogger, ILogger, Logger, LogLevel, LogWriter} from "/lib/Logger"
 import {NS} from "Bitburner";
 import {exploitable} from "/lib/ServerFunctions";
 import {TimedQueue} from "/lib/TimedQueue";
+import {Context, getNS} from "/lib/context";
 
 const scriptWeaken = "/hack/weaken.ns"
 const scriptHack = "/hack/hack.ns"
@@ -59,8 +60,8 @@ function newInitializationEvent(name: string): IEvent {
     }
 }
 
-async function optHack(ns: NS, event: NewEvent) {
-    const logger = getLogger(ns)
+/*
+async function optHack(ns: NS, logger: ILogger, event: NewEvent) {
     updateEvent(event)
     let server = new Server(ns, event.server)
     server.updateValues()
@@ -78,9 +79,12 @@ async function optHack(ns: NS, event: NewEvent) {
 
 }
 
-async function hackBetter(ns: NS, name: string): Promise<IEvent> {
-    const logger = getLogger(ns)
-    let server = new Server(ns, name)
+
+ */
+async function hackBetter(ctx: Context, name: string): Promise<IEvent> {
+    let ns = getNS(ctx)
+    let logger = getLogger(ctx)
+    let server = new Server(ctx, name)
     server.updateValues()
     let threads = 0
     let remain = 0
@@ -89,17 +93,17 @@ async function hackBetter(ns: NS, name: string): Promise<IEvent> {
     switch (action) {
         case Action.Weak:
             threads = server.weakThreads
-            remain = await runThreads(ns, scriptWeaken, threads, [server.name])
+            remain = await runThreads(ctx, scriptWeaken, threads, [server.name])
             duration = ns.getWeakenTime(server.name)
             break;
         case Action.Grow:
             threads = server.growThreads
-            remain = await runThreads(ns, scriptGrow, threads, [server.name])
+            remain = await runThreads(ctx, scriptGrow, threads, [server.name])
             duration = ns.getGrowTime(server.name)
             break;
         case Action.Hack:
             threads = server.hackThreads
-            remain = await runThreads(ns, scriptHack, server.hackThreads, [server.name])
+            remain = await runThreads(ctx, scriptHack, server.hackThreads, [server.name])
             duration = ns.getHackTime(server.name)
             break;
     }
@@ -118,19 +122,18 @@ async function hackBetter(ns: NS, name: string): Promise<IEvent> {
     }
 }
 
-function getServerListFromQueue(ns: NS, queue: TimedQueue<IEvent>): Map<string, Server> {
+function getServerListFromQueue(ctx: Context, queue: TimedQueue<IEvent>): Map<string, Server> {
     let hackingServers = new Map()
     for (let i = 0; i < queue.length(); i++) {
-        let server = new Server(ns, queue.data[i].server)
+        let server = new Server(ctx, queue.data[i].server)
         hackingServers.set(server.name, server)
     }
     return hackingServers
 }
 
-async function getHackableServers(ns: NS): Promise<IServer[]> {
+async function getHackableServers(ns: NS, logger: ILogger): Promise<IServer[]> {
     let result: IServer[] = []
     const serverMap = await loadServerMap(ns)
-    let logger = getLogger(ns)
     for (const server of serverMap.values()) {
         if (exploitable(ns, server)) {
             result.push(server)
@@ -148,19 +151,20 @@ export async function main(ns: NS) {
     ])
 
     ns.disableLog("ALL")
-    let logger = getLogger(ns)
+    let logger = new Logger(ns).withWriter(new LogWriter(ns))
     logger.withLevel(LogLevel.Debug)
+    let ctx = new Context(ns, logger)
     let queue = newEventQueue(ns)
     let hackingServers: Map<string, IServer> = new Map()
     const queueTimeout = 10000
     if (!opts.reset) {
         logger.info("loading queue")
         queue = await loadEventQueue(ns)
-        hackingServers = getServerListFromQueue(ns, queue)
+        hackingServers = getServerListFromQueue(ctx, queue)
     }
 
     while (true) {
-        for (const srv of await getHackableServers(ns)) {
+        for (const srv of await getHackableServers(ns, logger)) {
             if (hackingServers.has(srv.name)) {
                 continue
             }
@@ -180,7 +184,7 @@ export async function main(ns: NS) {
             }
             let srvState = await queue.blockShiftUntil(1000)
             if (srvState != undefined) {
-                let result = await hackBetter(ns, srvState.server)
+                let result = await hackBetter(ctx, srvState.server)
                 queue.push(result.duration, result)
                 await queue.saveToFile()
             }

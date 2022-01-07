@@ -1,4 +1,5 @@
 import {NS} from "Bitburner"
+import {Context} from "/lib/context";
 
 export enum LogLevel {
     Panic = -1,
@@ -24,7 +25,7 @@ export interface ILogger {
 
     panic(msg: string, ...args: any)
 
-    error(msg: string, ...args: any)
+    error(error: Error, msg: string, ...args: any)
 
     warning(msg: string, ...args: any)
 
@@ -70,7 +71,7 @@ export class Logger implements ILogger {
     level: LogLevel = LogLevel.Info
     private static _instance: Logger
 
-    private constructor(ns: NS, log?: logWriter) {
+    constructor(ns: NS, log?: logWriter) {
         this.ns = ns
         if (log) {
             this.log = log
@@ -79,7 +80,7 @@ export class Logger implements ILogger {
         }
     }
 
-    public static Instance(ns: NS) {
+    public static Instance(ns: NS): ILogger {
         return this._instance || (this._instance = new this(ns))
     }
 
@@ -130,7 +131,8 @@ export class Logger implements ILogger {
         this._log(LogLevel.Debug, msg, args)
     }
 
-    error(msg: string, ...args: any) {
+    error(error: Error, msg: string, ...args: any) {
+        msg += error.stack
         this._log(LogLevel.Error, msg, args)
     }
 
@@ -153,6 +155,6 @@ export class Logger implements ILogger {
 
 }
 
-export function getLogger(ns:NS) : ILogger {
-    return Logger.Instance(ns)
+export function getLogger(ctx: Context): ILogger {
+    return ctx.logger
 }

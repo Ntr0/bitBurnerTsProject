@@ -1,7 +1,8 @@
-import {getLogger, LogLevel, LogWriter} from "/lib/Logger"
+import {ILogger, Logger, LogLevel, LogWriter} from "/lib/Logger"
 import {loadEventQueue} from "/lib/EventQueue"
 import {loadServerMap} from "/lib/ServerMap"
 import {NS} from "Bitburner";
+import {Context} from "/lib/context";
 
 function makeid(length) {
     var result = '';
@@ -50,8 +51,7 @@ async function analyzeQueue(ns) {
     return overcommit * threadSize
 }
 
-function buyServer(ns: NS, suitableRam: number) {
-    let logger = getLogger(ns)
+function buyServer(ns: NS, logger: ILogger, suitableRam: number) {
     logger.debug(`got suiteable ram: ${suitableRam}`)
     if (suitableRam > 1 && suitableRam % 2 == 0) {
         let hostname = ns.purchaseServer(`pserv-${suitableRam}-${makeid(8)}`, suitableRam);
@@ -81,8 +81,7 @@ async function getFreeRam(ns: NS) {
     return sumFree
 }
 
-async function manageServers(ns: NS, maxServers: number) {
-    let logger = getLogger(ns)
+async function manageServers(ns: NS, logger: ILogger, maxServers: number) {
     let ramNeeded = await analyzeQueue(ns)
     let ramFree = await getFreeRam(ns)
     if (ramNeeded < ramFree) {
@@ -92,7 +91,7 @@ async function manageServers(ns: NS, maxServers: number) {
     let servers = ns.getPurchasedServers()
     let suitableRam = getSuitableRam(ns, ns.getServerMoneyAvailable("home"), ns.getPurchasedServerMaxRam())
     if (servers.length < maxServers) {
-        buyServer(ns, suitableRam)
+        buyServer(ns, logger, suitableRam)
         return
     }
     let [minRam, minServer] = getSmallestServer(ns, servers)
@@ -107,10 +106,11 @@ async function manageServers(ns: NS, maxServers: number) {
 }
 
 /** @param {NS} ns **/
-export async function main(ns) {
+export async function main(ns: NS) {
 
-    let logger = getLogger(ns).withWriter(new LogWriter(ns))
+    let logger = new Logger(ns).withWriter(new LogWriter(ns))
     logger.withLevel(LogLevel.Debug)
+    let ctx = new Context(ns, logger)
     ns.disableLog("ALL")
     logger.info("started")
     const maxServers = ns.getPurchasedServerLimit()
@@ -119,7 +119,7 @@ export async function main(ns) {
         return
     }
     while (true) {
-        await manageServers(ns, maxServers)
+        await manageServers(ns, logger, maxServers)
         await ns.sleep(10000)
     }
 }

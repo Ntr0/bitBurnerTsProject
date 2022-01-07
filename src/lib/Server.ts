@@ -2,6 +2,7 @@ import {NS} from "Bitburner"
 import {getLogger, ILogger} from "/lib/Logger"
 import {Action} from "/lib/consts";
 import {IServer} from "/lib/ServerMap";
+import {Context, getNS} from "/lib/context";
 
 const growthRatio = 0.9
 const hackRatio = 0.75 // we are only aming to get 75% of the money available, to optimize growth
@@ -36,15 +37,15 @@ export class Server implements IServer {
     private baseHackThreads: number = 0;
     hackChance: number = 0;
 
-    constructor(ns: NS, name, parent = "") {
-        this.ns = ns
-        this.logger = getLogger(ns)
+    constructor(ctx: Context, name, parent = "") {
+        this.ns = getNS(ctx)
+        this.logger = getLogger(ctx)
         this.name = name
         this.parent = parent
     }
 
-    static fromIServer(ns: NS, srv: IServer): Server {
-        let server = new Server(ns, srv.name, srv.parent)
+    static fromIServer(ctx: Context, srv: IServer): Server {
+        let server = new Server(ctx, srv.name, srv.parent)
         server.maximumMoney = srv.maximumMoney
         server.hackingLevel = srv.hackingLevel
         server.rooted = srv.rooted
@@ -130,11 +131,6 @@ export class Server implements IServer {
             throw (e)
         }
     }
-
-    updateScore() {
-        this.updateValues()
-    }
-
     /**
      * assumed that of 100 threads and a chance of 50%
      * it means that only 50 threads will be evective, we need to make some adoptions

@@ -49,16 +49,24 @@ export class TimedQueue<Type> {
         return this._shift()
     }
 
-    public async blockShift(): Promise<Type | undefined> {
+    /**
+     * blockShift will return the next item in the queue once the time for it has arrived.
+     * It will block till given timeout or until the item is now ripe, whatever is earlier
+     * @param maxDuration
+     */
+    public async blockShift(maxDuration: number = -1): Promise<Type | undefined> {
         if (this.queue.length == 0) {
             return undefined
         }
-
         let now = Date.now()
         if (this.queue[0] > now) {
-            await this.ns.sleep(this.queue[0] - now)
+            let timeout = this.queue[0] - now
+            if (maxDuration != -1) {
+                timeout = Math.min(timeout, maxDuration)
+            }
+            await this.ns.sleep(timeout)
         }
-        return this._shift()
+        return this.shift()
     }
 
     private _shift(): Type | undefined {
@@ -66,21 +74,23 @@ export class TimedQueue<Type> {
         return this.data.shift()
     }
 
+    /**
+     * shift returns undefined if no item is to be processed now, or if the queue is empty.
+     * Otherwise item of Type is returned
+     */
     public shift(): Type | undefined {
-        if (this.queue[0] > Date.now()) {
+        if (this.queue.length == 0 || this.queue[0] > Date.now()) {
             return undefined
         }
         return this._shift()
-
     }
 
     public length() {
         return this.queue.length
     }
 
-    public push(duration: number, event: Type) {
+    public pushAbs(dueTime: number, event: Type) {
         let index = 0
-        let dueTime = Date.now() + duration
         for (; index < this.queue.length; index++) {
             if (dueTime < this.queue[index]) {
                 break;
@@ -88,6 +98,10 @@ export class TimedQueue<Type> {
         }
         this.queue.splice(index, 0, dueTime)
         this.data.splice(index, 0, event)
+    }
+
+    public push(duration: number, event: Type) {
+        this.pushAbs(Date.now() + duration, event)
     }
 
     public async saveToFile() {

@@ -1,12 +1,14 @@
-import { Server } from "/lib/Server"
+import {Server} from "/lib/Server"
+
 //import {loadServerMap} from "/lib/ServerMap.ts"
 export function autocomplete(data, args) {
     return [...data.servers]
 }
+
 /** @param {NS} ns **/
 export async function main(ns) {
     var srv = new Server(ns, ns.args[0])
-    srv.updateScore()
+    srv.updateValues()
     srv.printInfo()
 /*
     var serverMap = await loadServerMap(ns)

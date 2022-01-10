@@ -1,5 +1,5 @@
 import {Server} from "/lib/Server"
-import {Action} from "/lib/consts";
+import {Action, Script} from "/lib/consts";
 import {IServer, loadServerMap} from "/lib/ServerMap"
 import {IEvent, loadEventQueue, newEventQueue} from "/lib/EventQueue"
 import {runThreads} from "/lib/Scheduler"
@@ -8,10 +8,6 @@ import {NS} from "Bitburner";
 import {exploitable} from "/lib/ServerFunctions";
 import {TimedQueue} from "/lib/TimedQueue";
 import {Context, getNS} from "/lib/context";
-
-const scriptWeaken = "/hack/weaken.ns"
-const scriptHack = "/hack/hack.ns"
-const scriptGrow = "/hack/grow.ns"
 
 
 async function analyzeQueue(queue) {
@@ -93,17 +89,17 @@ async function hackBetter(ctx: Context, name: string): Promise<IEvent> {
     switch (action) {
         case Action.Weak:
             threads = server.weakThreads
-            remain = await runThreads(ctx, scriptWeaken, threads, [server.name])
+            remain = await runThreads(ctx, Script.Weaken, threads, [server.name])
             duration = ns.getWeakenTime(server.name)
             break;
         case Action.Grow:
             threads = server.growThreads
-            remain = await runThreads(ctx, scriptGrow, threads, [server.name])
+            remain = await runThreads(ctx, Script.Grow, threads, [server.name])
             duration = ns.getGrowTime(server.name)
             break;
         case Action.Hack:
             threads = server.hackThreads
-            remain = await runThreads(ctx, scriptHack, server.hackThreads, [server.name])
+            remain = await runThreads(ctx, Script.Hack, server.hackThreads, [server.name])
             duration = ns.getHackTime(server.name)
             break;
     }
@@ -148,8 +144,9 @@ async function getHackableServers(ns: NS, logger: ILogger): Promise<IServer[]> {
 export async function main(ns: NS) {
     let opts = ns.flags([
         ["reset", false],
+        ["server", []],
     ])
-
+    let servers: string[] = opts.server
     ns.disableLog("ALL")
     let logger = new Logger(ns).withWriter(new LogWriter(ns))
     logger.withLevel(LogLevel.Debug)
@@ -166,6 +163,9 @@ export async function main(ns: NS) {
     while (true) {
         for (const srv of await getHackableServers(ns, logger)) {
             if (hackingServers.has(srv.name)) {
+                continue
+            }
+            if (!(servers.length == 0 || servers.includes(srv.name))) {
                 continue
             }
             queue.push(0, newInitializationEvent(srv.name))

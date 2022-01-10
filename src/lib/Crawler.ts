@@ -13,7 +13,7 @@ class Crawler {
         this.logger = getLogger(ctx)
     }
 
-    async updateServer(serverMap, name, parent) {
+    async updateServer(ctx: Context, serverMap, name, parent) {
         let ns = this.ns
         let srv = serverMap.get(name)
         if (srv === undefined) {
@@ -36,21 +36,19 @@ class Crawler {
             } else {
                 srv.rooted = true
             }
-            /*
             if (!srv.backdoor) {
-                srv.backdoor = await this.installBackdoor(serverMap, srv)
+                //   srv.backdoor = await installBackdoor(ctx, serverMap, srv)
             }
-             */
         }
         await saveServerMap(ns, serverMap)
     }
 
-    async scanServer(serverMap, visited, name, parent, depth) {
+    async scanServer(ctx: Context, serverMap, visited, name, parent, depth) {
         let ns = this.ns
         if (visited.indexOf(name) > -1) {
             return
         }
-        await this.updateServer(serverMap, name, parent)
+        await this.updateServer(ctx, serverMap, name, parent)
         const servers = ns.scan(name)
         visited.push(name)
         if (depth > 0) {
@@ -60,7 +58,7 @@ class Crawler {
                 } else if (visited.indexOf(child) > -1) {
                     continue
                 }
-                await this.scanServer(serverMap, visited, child, name, depth - 1)
+                await this.scanServer(ctx, serverMap, visited, child, name, depth - 1)
                 await ns.sleep(100)
             }
         }
@@ -84,6 +82,6 @@ export async function crawl(ctx, reset: boolean, depth: number) {
         cleanServerMap(ns, serverMap)
     }
     let visited = []
-    await crawler.scanServer(serverMap, visited, "home", undefined, depth)
+    await crawler.scanServer(ctx, serverMap, visited, "home", undefined, depth)
     await saveServerMap(ns, serverMap)
 }

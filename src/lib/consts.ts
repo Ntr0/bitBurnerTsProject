@@ -4,13 +4,11 @@ export const path = {
 }
 export const pathEventQueue = "/pvc/eventqueue.txt"
 
-export const scriptWeaken = "/hack/weaken.ns"
-export const scriptHack = "/hack/hack.ns"
-export const scriptGrow = "/hack/grow.ns"
-
-export const actionWeaken = "weak"
-export const actionGrow = "grow"
-export const actionHack = "hack"
+export enum Script {
+    Weaken = "/hack/weaken.js",
+    Hack = "/hack/hack.js",
+    Grow = "/hack/grow.js",
+}
 
 export enum Action {
     Init = "init",

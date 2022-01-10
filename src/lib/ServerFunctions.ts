@@ -19,33 +19,25 @@ export function exploitable(ns: NS, server: IServer): boolean {
     )
 }
 
-/*
-export function connect(serverMap: Map<string, IServer>, target: string) {
-        let path = getPath(serverMap, this.ns.getCurrentServer(), target)
-        this.logger.debug(`connection path from ${this.ns.getHostname()}->${target}: ${path} `)
-        for (const srv of path) {
-            this.logger.debug(`connecting to ${srv}`)
-            this.ns.connect(srv)
-        }
-    }
 
-export async function installBackdoor(serverMap: Map<string, IServer>, server: IServer): Promise<boolean> {
+export async function installBackdoor(ctx: Context, serverMap: Map<string, IServer>, server: IServer): Promise<boolean> {
+    const ns = getNS(ctx)
     if (server.name == "home") {
         return true
     }
-    if (hackable(this.ns, server)) {
-        let host = this.ns.getCurrentServer()
-        this.connect(serverMap, server.name)
-        if (this.ns.getCurrentServer() != server.name) {
+    if (hackable(ns, server)) {
+        let host = ns.getCurrentServer()
+        connect(ctx, serverMap, server.name)
+        if (ns.getCurrentServer() != server.name) {
             return false
         }
-        await this.ns.installBackdoor()
-        this.connect(serverMap, host)
+        await ns.installBackdoor()
+        connect(ctx, serverMap, host)
         return true
     }
     return false
 }
- */
+
 export function rootServer(ns: NS, logger: ILogger, name: string): boolean {
     let hacks = new Map()
     hacks.set("FTPCrack.exe", ns.ftpcrack)
@@ -102,8 +94,8 @@ export function getPath(serverMap: Map<string, IServer>, from: string, target: s
 export function connect(ctx: Context, serverMap: Map<string, IServer>, target: string) {
     let logger = getLogger(ctx)
     let ns = getNS(ctx)
-    let cur = ns.getHostname()
-    for (const srv of getPath(serverMap, ns.getHostname(), target)) {
+    let cur = ns.getCurrentServer()
+    for (const srv of getPath(serverMap, cur, target)) {
         if (!ns.connect(srv)) {
             logger.error(new Error(`could not connect to ${srv}`), "")
         }
